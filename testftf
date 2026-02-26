@@ -111,6 +111,64 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     end
 end)
 
+
+
+
+-- Add to your hub (e.g., in a "Player" or "Movement" tab/section)
+-- Assume you have: local Players = game:GetService("Players"); local LocalPlayer = Players.LocalPlayer
+-- This works for Survivors (hides model from everyone, including beast visuals)
+
+local InvisToggle = PlayerTab:AddToggle("Invisibility", {  -- Replace PlayerTab with your tab name
+    Text = "Invisibility",
+    Default = false,
+    Tooltip = "Make yourself invisible to everyone (local + remote spoof)",
+    Callback = function(Value)
+        local char = LocalPlayer.Character
+        if not char then return end
+        
+        if Value then
+            -- Full invis: parts + accessories + noclip bonus
+            for _, v in pairs(char:GetChildren()) do
+                if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+                    v.Transparency = 1
+                    v.LocalTransparencyModifier = 1
+                    v.CanCollide = false
+                elseif v:IsA("Accessory") then
+                    v:Destroy()  -- Drop hats/glasses for cleaner look
+                end
+            end
+            char.Head.face.Texture = "rbxasset://textures/face.png"  -- Hide face (optional)
+            
+            -- Respawn handler
+            LocalPlayer.CharacterAdded:Connect(function(newChar)
+                if InvisToggle.Value then
+                    task.wait(1)  -- Wait for full load
+                    char = newChar
+                    -- Re-apply invis (copy the loop above)
+                    for _, v in pairs(char:GetChildren()) do
+                        if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+                            v.Transparency = 1
+                            v.LocalTransparencyModifier = 1
+                            v.CanCollide = false
+                        elseif v:IsA("Accessory") then
+                            v:Destroy()
+                        end
+                    end
+                    char.Head.face.Texture = "rbxasset://textures/face.png"
+                end
+            end)
+        else
+            -- Revert: reset transparency/collide (accessories respawn naturally)
+            for _, v in pairs(char:GetChildren()) do
+                if v:IsA("BasePart") then
+                    v.Transparency = 0
+                    v.LocalTransparencyModifier = 0
+                    v.CanCollide = true  -- Or original value if you track it
+                end
+            end
+        end
+    end
+})
 -----------------------------------------------------------------------------------------------------
 
 -- Player Tab Content --

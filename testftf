@@ -114,56 +114,65 @@ end)
 
 
 
--- Add to your hub (e.g., in a "Player" or "Movement" tab/section)
--- Assume you have: local Players = game:GetService("Players"); local LocalPlayer = Players.LocalPlayer
--- This works for Survivors (hides model from everyone, including beast visuals)
+-- Globals for state (add near top, after services)
+getgenv().InvisEnabled = false
+getgenv().InvisConnection = nil  -- To store the one-time respawn handler
 
-local InvisToggle = PlayerTab:AddToggle("Invisibility", {  -- Replace PlayerTab with your tab name
-    Text = "Invisibility",
-    Default = false,
-    Tooltip = "Make yourself invisible to everyone (local + remote spoof)",
-    Callback = function(Value)
-        local char = LocalPlayer.Character
-        if not char then return end
-        
-        if Value then
-            -- Full invis: parts + accessories + noclip bonus
+-- One-time respawn handler for invis (connect once)
+if not getgenv().InvisConnection then
+    getgenv().InvisConnection = LocalPlayer.CharacterAdded:Connect(function(newChar)
+        task.wait(0.5)  -- Slightly safer wait
+        if getgenv().InvisEnabled and newChar then
+            local char = newChar
             for _, v in pairs(char:GetChildren()) do
                 if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
                     v.Transparency = 1
                     v.LocalTransparencyModifier = 1
                     v.CanCollide = false
                 elseif v:IsA("Accessory") then
-                    v:Destroy()  -- Drop hats/glasses for cleaner look
+                    v:Destroy()
                 end
             end
-            char.Head.face.Texture = "rbxasset://textures/face.png"  -- Hide face (optional)
-            
-            -- Respawn handler
-            LocalPlayer.CharacterAdded:Connect(function(newChar)
-                if InvisToggle.Value then
-                    task.wait(1)  -- Wait for full load
-                    char = newChar
-                    -- Re-apply invis (copy the loop above)
-                    for _, v in pairs(char:GetChildren()) do
-                        if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
-                            v.Transparency = 1
-                            v.LocalTransparencyModifier = 1
-                            v.CanCollide = false
-                        elseif v:IsA("Accessory") then
-                            v:Destroy()
-                        end
-                    end
-                    char.Head.face.Texture = "rbxasset://textures/face.png"
+            local face = char:FindFirstChild("Head") and char.Head:FindFirstChild("face")
+            if face and face:IsA("Decal") then
+                face.Texture = "rbxasset://textures/face.png"
+            end
+        end
+    end)
+end
+
+-- The toggle itself
+local InvisToggle = PlayerTab:AddToggle("Invisibility", {
+    Text = "Invisibility",
+    Default = false,
+    Tooltip = "Make yourself invisible (local + noclip). Beast sees nothing!",
+    Callback = function(Value)
+        getgenv().InvisEnabled = Value
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+        if Value then
+            -- Apply now
+            for _, v in pairs(char:GetChildren()) do
+                if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+                    v.Transparency = 1
+                    v.LocalTransparencyModifier = 1
+                    v.CanCollide = false
+                elseif v:IsA("Accessory") then
+                    v:Destroy()
                 end
-            end)
+            end
+            local face = char:FindFirstChild("Head") and char.Head:FindFirstChild("face")
+            if face and face:IsA("Decal") then
+                face.Texture = "rbxasset://textures/face.png"
+            end
         else
-            -- Revert: reset transparency/collide (accessories respawn naturally)
+            -- Revert now (accessories auto-respawn on animation load usually)
             for _, v in pairs(char:GetChildren()) do
                 if v:IsA("BasePart") then
                     v.Transparency = 0
                     v.LocalTransparencyModifier = 0
-                    v.CanCollide = true  -- Or original value if you track it
+                    v.CanCollide = true
                 end
             end
         end
